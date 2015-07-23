@@ -2,39 +2,41 @@ zk:
   image: bobrik/zookeeper
   ports:
    - 2181:2181
+   - 2888:2888
+   - 3888:3888
   environment:
     ZK_CONFIG: tickTime=2000,initLimit=10,syncLimit=5,maxClientCnxns=128,forceSync=no,clientPort=2181
     ZK_ID: 1
 
 master:
   image: mesosphere/mesos-master:0.22.1-1.0.ubuntu1404
-  net: host
+  ports:
+   - 5050:5050
+  links:
+      - zk:zk
   environment:
-    MESOS_ZK: zk://127.0.0.1:2181/mesos
-    MESOS_HOSTNAME: 192.168.59.103
-    MESOS_IP: 192.168.59.103
+    MESOS_ZK: zk://zk:2181/mesos
+    MESOS_LOG_DIR: /var/log/mesos
     MESOS_QUORUM: 1
-    MESOS_CLUSTER: docker-compose
     MESOS_WORK_DIR: /var/lib/mesos
 
 slave:
   image: mesosphere/mesos-slave:0.22.1-1.0.ubuntu1404
-  net: host
-  pid: host
+  links:
+      - zk:zk
+      - master:master
   environment:
-    MESOS_MASTER: zk://127.0.0.1:2181/mesos
-    MESOS_HOSTNAME: 192.168.59.103
-    MESOS_IP: 192.168.59.103
-    MESOS_CONTAINERIZERS: docker,mesos
-  volumes:
-    - /sys/fs/cgroup:/sys/fs/cgroup
-    - /usr/local/bin/docker:/usr/bin/docker
-    - /var/run/docker.sock:/var/run/docker.sock
+    MESOS_HOSTNAME: 192.168.33.10
+    MESOS_MASTER: zk://zk:2181/mesos
+    MESOS_LOG_DIR: /var/log/mesos
+    MESOS_LOGGING_LEVEL: INFO
 
 marathon:
   image: mesosphere/marathon:v0.9.0
-  net: host
+  links:
+      - zk:zk
+      - master:master
   environment:
-    MARATHON_MASTER: zk://127.0.0.1:2181/mesos
-    MARATHON_ZK: zk://127.0.0.1:2181/marathon
-    MARATHON_HOSTNAME: 192.168.59.103
+    MARATHON_MASTER: zk://zk:2181/mesos
+    MARATHON_ZK: zk://zk:2181/marathon
+    MESOS_HOSTNAME: 192.168.33.10
